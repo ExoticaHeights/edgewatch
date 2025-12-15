@@ -1,0 +1,74 @@
+
+name: Build
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or tag to build (e.g. develop, feature/foo, v2025.10)"
+        required: true
+        default: "develop"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Prepare build log
+        run: |
+          mkdir -p logs
+          echo "Build started at $(date)" > logs/build.log
+          echo "Ref: ${{ github.event.inputs.ref }}" >> logs/build.log
+          echo "Commit: $(git rev-parse HEAD)" >> logs/build.log
+          echo "---------------------------------" >> logs/build.log
+
+      - name: Build (example)
+        run: |
+          {
+            echo "Running build..."
+            uname -a
+            echo "Simulated build step"
+            sleep 2
+            echo "Build finished successfully"
+          } | tee -a logs/build.log
+
+      # 🔹 Upload FULL BUILD LOG (always)
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ github.event.inputs.ref }}
+          path: logs/build.log
+
+      # 🔹 Create build artifact (example tar)
+      - name: Package build output
+        run: |
+          mkdir -p output
+          echo "dummy artifact" > output/example.txt
+          tar -czf output/build-output.tar.gz output/example.txt
+
+      # 🔹 Upload artifact to workflow run
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output-${{ github.event.inputs.ref }}
+          path: output/build-output.tar.gz
+
+      # 🔹 Upload artifact to GitHub Release (ONLY for tags)
+      - name: Upload to GitHub Release
+        if: startsWith(github.event.inputs.ref, 'v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.ref }}
+          files: |
+            output/build-output.tar.gz
+            logs/build.log
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
