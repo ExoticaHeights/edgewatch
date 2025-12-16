@@ -1,4 +1,3 @@
-
 name: Build
 
 permissions:
@@ -8,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch or tag to build (e.g. develop, feature/foo, v2025.10)"
+        description: "Branch or tag (develop, feature/x, v1.2.0)"
         required: true
         default: "develop"
 
@@ -22,53 +21,64 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref }}
 
-      - name: Prepare build log
+      # -----------------------------
+      # Determine RELEASE_TYPE
+      # -----------------------------
+      - name: Determine release type
+        id: rel
         run: |
-          mkdir -p logs
-          echo "Build started at $(date)" > logs/build.log
-          echo "Ref: ${{ github.event.inputs.ref }}" >> logs/build.log
-          echo "Commit: $(git rev-parse HEAD)" >> logs/build.log
-          echo "---------------------------------" >> logs/build.log
+          REF="${{ github.event.inputs.ref }}"
+          if [[ "$REF" == "develop" ]]; then
+            echo "type=alpha" >> $GITHUB_OUTPUT
+          elif [[ "$REF" == feature/* ]]; then
+            echo "type=feature" >> $GITHUB_OUTPUT
+          elif [[ "$REF" == v* ]]; then
+            echo "type=production" >> $GITHUB_OUTPUT
+          else
+            echo "type=dev" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Build (example)
+      # -----------------------------
+      # Build using Makefile
+      # -----------------------------
+      - name: Build
         run: |
-          {
-            echo "Running build..."
-            uname -a
-            echo "Simulated build step"
-            sleep 2
-            echo "Build finished successfully"
-          } | tee -a logs/build.log
+          make \
+            GIT_REF=${{ github.event.inputs.ref }} \
+            COMMIT_SHA=$(git rev-parse HEAD) \
+            RELEASE_TYPE=${{ steps.rel.outputs.type }} \
+            | tee -a logs/build.log
 
-      # 🔹 Upload FULL BUILD LOG (always)
+      # -----------------------------
+      # Upload logs (ALWAYS)
+      # -----------------------------
       - name: Upload build log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-log-${{ github.event.inputs.ref }}
           path: logs/build.log
 
-      # 🔹 Create build artifact (example tar)
-      - name: Package build output
-        run: |
-          mkdir -p output
-          echo "dummy artifact" > output/example.txt
-          tar -czf output/build-output.tar.gz output/example.txt
-
-      # 🔹 Upload artifact to workflow run
-      - name: Upload build artifact
+      # -----------------------------
+      # Upload build artifacts
+      # -----------------------------
+      - name: Upload build output
         uses: actions/upload-artifact@v4
         with:
           name: build-output-${{ github.event.inputs.ref }}
-          path: output/build-output.tar.gz
+          path: output/
 
-      # 🔹 Upload artifact to GitHub Release (ONLY for tags)
+      # -----------------------------
+      # GitHub Release (tags only)
+      # -----------------------------
       - name: Upload to GitHub Release
         if: startsWith(github.event.inputs.ref, 'v')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.ref }}
           files: |
-            output/build-output.tar.gz
+            output/*
             logs/build.log
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
