@@ -15,8 +15,8 @@ jobs:
 
           echo "PR from $HEAD to $BASE"
 
-          if [[ "$BASE" == "master" && "$HEAD" != "develop" ]]; then
-            echo "❌ Only develop can merge into master"
+          if [[ "$BASE" == "main" && "$HEAD" != "develop" ]]; then
+            echo "❌ Only develop can merge into main"
             exit 1
           fi
 
