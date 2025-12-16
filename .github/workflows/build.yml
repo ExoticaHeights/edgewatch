@@ -1,13 +1,13 @@
-name: Build
+name: Build Test (Email Enabled)
 
 permissions:
-  contents: write
+  contents: read
 
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch or tag (develop, feature/x, v1.2.0)"
+        description: "Branch or tag to test (develop, feature/x, v1.2.0)"
         required: true
         default: "develop"
 
@@ -21,9 +21,6 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref }}
 
-      # -----------------------------
-      # Determine RELEASE_TYPE
-      # -----------------------------
       - name: Determine release type
         id: rel
         run: |
@@ -38,47 +35,9 @@ jobs:
             echo "type=dev" >> $GITHUB_OUTPUT
           fi
 
-      # -----------------------------
-      # Build using Makefile
-      # -----------------------------
-      - name: Build
+      - name: Build test (email on success/failure)
         run: |
           make \
             GIT_REF=${{ github.event.inputs.ref }} \
             COMMIT_SHA=$(git rev-parse HEAD) \
-            RELEASE_TYPE=${{ steps.rel.outputs.type }} \
-            | tee -a logs/build.log
-
-      # -----------------------------
-      # Upload logs (ALWAYS)
-      # -----------------------------
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log-${{ github.event.inputs.ref }}
-          path: logs/build.log
-
-      # -----------------------------
-      # Upload build artifacts
-      # -----------------------------
-      - name: Upload build output
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output-${{ github.event.inputs.ref }}
-          path: output/
-
-      # -----------------------------
-      # GitHub Release (tags only)
-      # -----------------------------
-      - name: Upload to GitHub Release
-        if: startsWith(github.event.inputs.ref, 'v')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.ref }}
-          files: |
-            output/*
-            logs/build.log
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+            RELEASE_TYPE=${{ steps.rel.outputs.type }}
