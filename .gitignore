@@ -1,0 +1,24 @@
+# Build outputs
+output/
+build/
+
+# Kernel / U-Boot artifacts
+*.o
+*.a
+*.so
+*.dtb
+*.img
+*.bin
+*.elf
+
+# Filesystems
+*.ext4
+*.cpio
+
+# Logs
+*.log
+
+# Editor files
+*.swp
+*.swo
+.vscode/
