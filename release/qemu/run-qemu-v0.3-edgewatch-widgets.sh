@@ -19,7 +19,10 @@ SHA_FILE="$BIN_DIR/SHA256SUMS"
 QEMU_RAM=1024
 QEMU_CPU="cortex-a57"
 
-BOOTARGS="console=ttyAMA0 root=/dev/vda rw earlycon=pl011,0x09000000"
+#BOOTARGS="console=ttyAMA0 root=/dev/vda rw quiet loglevel=0 earlycon=pl011,0x09000000 fbcon=map:off vt.global_cursor_default=0"
+
+BOOTARGS="console=tty1 console=ttyAMA0 root=/dev/vda rw"
+
 
 # ----------------------------------------------------------
 # Helpers
@@ -86,5 +89,12 @@ exec qemu-system-aarch64 \
   -kernel "$KERNEL_IMAGE" \
   -append "$BOOTARGS" \
   -drive file="$ROOTFS_IMAGE",format=raw,if=virtio \
-  -nographic
+  -device virtio-gpu-pci \
+  -display gtk \
+  -device usb-ehci \
+  -device usb-mouse \
+  -device usb-kbd \
+  -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+  -device virtio-net-device,netdev=net0
+
 
