@@ -11,6 +11,7 @@ BUILD_DIR     := $(abspath $(strip $(BUILD_DIR_RAW)))
 
 CONFIG_DIR    := configs
 CONFIG_FILE   := $(CONFIG_DIR)/edgewatch_defconfig
+KERNEL_IMAGE  := $(BUILD_DIR)/output/images/Image
 
 REMOTE        := origin
 
@@ -69,6 +70,13 @@ menuconfig: prepare
 	@$(MAKE) sync-config
 
 # =========================================================
+# Configuration
+# =========================================================
+build: prepare
+	$(MAKE) -C "$(BUILD_DIR)" -j$(shell nproc)
+	@echo "✔ Build completed"
+
+# =========================================================
 # Sync ONLY .config into Git-visible path
 # =========================================================
 sync-config:
@@ -104,10 +112,15 @@ check-remote-tag:
 			exit 1; \
 	fi
 
+check-kernel:
+	@test -f "$(KERNEL_IMAGE)" || \
+	 (echo "ERROR: Kernel image not found: $(KERNEL_IMAGE)"; exit 1)
+
+
 # =========================================================
 # Release (NO COMMITS, RELEASE ONLY)
 # =========================================================
-release: check-clean git-config check-tag-exists check-remote-tag defconfig
+release: check-clean git-config check-tag-exists check-remote-tag defconfig build check-kernel
 	@echo "→ Releasing BSP config $(TAG_NAME)"
 	@echo "✔ Using existing committed config: $(CONFIG_FILE)"
 	@git tag -a "$(TAG_NAME)" -m "EdgeWatch BSP config $(TAG_NAME)"
@@ -122,7 +135,9 @@ gh-release:
 	@gh release create "$(TAG_NAME)" \
 			--title "$(TAG_NAME)" \
 			--notes "EdgeWatch BSP config release $(TAG_NAME)" \
-			"$(CONFIG_FILE)"
+			"$(CONFIG_FILE)" \
+			"$(KERNEL_IMAGE)" \
+			|| (echo "ERROR: GitHub release failed"; exit 1)
 
 publish: release push gh-release
 	@echo "✔ BSP $(TAG_NAME) published successfully"
