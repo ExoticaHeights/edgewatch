@@ -35,14 +35,20 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-      - name: Build BSP
+      - name: Build BSP (errors only)
         run: |
-          make build VERSION=${{ inputs.version }} > build.log 2>&1
+          set -o pipefail
+          make build VERSION=${{ inputs.version }} \
+            > build.log 2> >(tee build.err >&2)
       
-      - name: Upload build log
+      - name: Upload build logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: build-log
-          path: build.log
+          name: build-logs
+          path: |
+            build.log
+            build.err
+
 
 
