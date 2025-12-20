@@ -1,0 +1,62 @@
+name: EdgeWatch BSP Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "BSP version (e.g. 0.1.2)"
+        required: true
+        type: string
+
+jobs:
+  bsp-release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write   # required for tags & releases
+
+    steps:
+      # -------------------------------------------------
+      # Checkout repo (with submodules)
+      # -------------------------------------------------
+      - name: Checkout EdgeWatch repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0   # REQUIRED for tags
+
+      # -------------------------------------------------
+      # Install dependencies
+      # -------------------------------------------------
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            git \
+            gh
+
+      # -------------------------------------------------
+      # Authenticate GitHub CLI
+      # -------------------------------------------------
+      - name: Authenticate gh
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      # -------------------------------------------------
+      # Verify version input
+      # -------------------------------------------------
+      - name: Validate version input
+        run: |
+          if [[ -z "${{ inputs.version }}" ]]; then
+            echo "ERROR: version input is empty"
+            exit 1
+          fi
+          echo "Releasing BSP version: ${{ inputs.version }}"
+
+      # -------------------------------------------------
+      # Run BSP publish (Makefile is source of truth)
+      # -------------------------------------------------
+      - name: Publish BSP Release
+        run: |
+          make publish VERSION=${{ inputs.version }}
