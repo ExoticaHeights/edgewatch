@@ -8,7 +8,10 @@ BUILD_DIR_RAW     := build
 
 BUILDROOT_SRC := $(abspath $(strip $(BUILDROOT_SRC_RAW)))
 BUILD_DIR     := $(abspath $(strip $(BUILD_DIR_RAW)))
-JSON_FILE     := $(BUILD_DIR)/buildroot.json
+
+CONFIG_DIR    := configs
+CONFIG_FILE   := $(CONFIG_DIR)/edgewatch_defconfig
+
 REMOTE        := origin
 
 # ---------------- Buildroot ----------------
@@ -24,8 +27,8 @@ TAG_PREFIX := edgewatch-bsp-v
 TAG_NAME   := $(TAG_PREFIX)$(VERSION)
 
 # ---------------- Phony ----------------
-.PHONY: help prepare defconfig menuconfig build \
-        gen-json git-config check-clean \
+.PHONY: help prepare defconfig menuconfig \
+        sync-config git-config check-clean \
         check-tag-exists check-remote-tag \
         release push gh-release publish
 
@@ -39,11 +42,10 @@ help:
 	@echo "  make publish VERSION=x.y.z"
 	@echo ""
 	@echo "Releases ONLY:"
-	@echo "  build/.config"
-	@echo "  build/buildroot.json"
+	@echo "  configs/edgewatch_defconfig"
 
 # =========================================================
-# Prepare build directory (COPY, NEVER MODIFY SUBMODULE)
+# Prepare build directory (RUNTIME ONLY)
 # =========================================================
 prepare:
 	@echo "BUILDROOT_SRC = '$(BUILDROOT_SRC)'"
@@ -60,27 +62,18 @@ prepare:
 # =========================================================
 defconfig: prepare
 	$(MAKE) -C "$(BUILD_DIR)" $(DEFCONFIG)
-	@$(MAKE) gen-json
+	@$(MAKE) sync-config
 
 menuconfig: prepare
 	$(MAKE) -C "$(BUILD_DIR)" menuconfig
-	@$(MAKE) gen-json
-
-build: prepare
-	$(MAKE) -C "$(BUILD_DIR)"
+	@$(MAKE) sync-config
 
 # =========================================================
-# JSON generation (OUTPUT ONLY)
+# Sync ONLY .config into Git-visible path
 # =========================================================
-gen-json:
-	@echo "Generating $(JSON_FILE)"
-	@echo '{' > "$(JSON_FILE)"
-	@echo '  "project": "EdgeWatch",' >> "$(JSON_FILE)"
-	@echo '  "component": "buildroot-config",' >> "$(JSON_FILE)"
-	@echo '  "bsp_version": "$(VERSION)",' >> "$(JSON_FILE)"
-	@echo '  "defconfig": "$(DEFCONFIG)",' >> "$(JSON_FILE)"
-	@echo '  "config_path": "build/.config"' >> "$(JSON_FILE)"
-	@echo '}' >> "$(JSON_FILE)"
+sync-config:
+	@mkdir -p "$(CONFIG_DIR)"
+	@cp "$(BUILD_DIR)/.config" "$(CONFIG_FILE)"
 
 # =========================================================
 # Git identity (SELF-CONTAINED, LOCAL + CI)
@@ -112,16 +105,16 @@ check-remote-tag:
 	fi
 
 # =========================================================
-# Release (CONFIG ONLY)
+# Release (ONLY configs/edgewatch_defconfig)
 # =========================================================
 release: check-clean git-config check-tag-exists check-remote-tag defconfig
 	@echo "→ Releasing BSP config $(TAG_NAME)"
-	@git add -f "$(BUILD_DIR)/.config" "$(JSON_FILE)"
+	@git add "$(CONFIG_FILE)"
 	@git commit -m "BSP config release $(TAG_NAME)"
 	@git tag -a "$(TAG_NAME)" -m "EdgeWatch BSP config $(TAG_NAME)"
 
 # =========================================================
-# Push + GitHub Release (UPSTREAM SAFE)
+# Push + GitHub Release
 # =========================================================
 push:
 	@git push --follow-tags || \
@@ -131,7 +124,7 @@ gh-release:
 	@gh release create "$(TAG_NAME)" \
 		--title "$(TAG_NAME)" \
 		--notes "EdgeWatch BSP config release $(TAG_NAME)" \
-		"$(BUILD_DIR)/.config" "$(JSON_FILE)"
+		"$(CONFIG_FILE)"
 
 publish: release push gh-release
 	@echo "✔ BSP $(TAG_NAME) published successfully"
