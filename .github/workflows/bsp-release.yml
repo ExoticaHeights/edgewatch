@@ -37,4 +37,4 @@ jobs:
 
       - name: Publish BSP config
         run: |
-          make publish VERSION=${{ inputs.version }}
+          make publish VERSION=${{ inputs.version }} > build.log 2>&1
