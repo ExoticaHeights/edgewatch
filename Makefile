@@ -12,6 +12,7 @@ BUILD_DIR     := $(abspath $(strip $(BUILD_DIR_RAW)))
 CONFIG_DIR    := configs
 CONFIG_FILE   := $(CONFIG_DIR)/edgewatch_defconfig
 KERNEL_IMAGE  := $(BUILD_DIR)/output/images/Image
+TOOLCHAIN_IMAGE := $(BUILD_DIR)/output/images/EdgeWatch.tar.gz
 
 REMOTE        := origin
 
@@ -73,7 +74,9 @@ menuconfig: prepare
 # Configuration
 # =========================================================
 build: prepare
+	cp -R $(CONFIG_DIR)/new_config $(BUILD_DIR)/.config
 	$(MAKE) -C "$(BUILD_DIR)" -j$(shell nproc)
+	mv $(BUILD_DIR)/output/images/*.tar.gz $(BUILD_DIR)/$(TOOLCHAIN_IMAGE)
 	@echo "✔ Build completed"
 
 # =========================================================
@@ -137,6 +140,7 @@ gh-release:
 			--notes "EdgeWatch BSP config release $(TAG_NAME)" \
 			"$(CONFIG_FILE)" \
 			"$(KERNEL_IMAGE)" \
+			"$(TOOLCHAIN_IMAEG)" \
 			|| (echo "ERROR: GitHub release failed"; exit 1)
 
 publish: release push gh-release
