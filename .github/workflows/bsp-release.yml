@@ -35,6 +35,14 @@ jobs:
             build-essential \
             git \
             gh
+            
+      # -------------------------------------------------
+      # Configure git identity for CI commits
+      # -------------------------------------------------
+      - name: Configure git user
+        run: |
+          git config --global user.name "edgewatch-ci"
+          git config --global user.email "edgewatch-ci@users.noreply.github.com"
 
       # -------------------------------------------------
       # Authenticate GitHub CLI
