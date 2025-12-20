@@ -35,6 +35,14 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-      - name: Publish BSP config
+      - name: Build BSP
         run: |
-          make publish VERSION=${{ inputs.version }}
+          make build VERSION=${{ inputs.version }} > build.log 2>&1
+      
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+
+
