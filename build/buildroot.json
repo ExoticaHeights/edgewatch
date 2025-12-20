@@ -1,7 +1,0 @@
-{
-  "project": "EdgeWatch",
-  "component": "buildroot-config",
-  "bsp_version": "1.0.0",
-  "defconfig": "qemu_aarch64_virt_defconfig",
-  "config_path": "build/.config"
-}
