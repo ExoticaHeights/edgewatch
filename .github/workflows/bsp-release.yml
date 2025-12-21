@@ -74,9 +74,12 @@ jobs:
       - name: Prepare build directory on /mnt
         run: |
           rm -rf $GITHUB_WORKSPACE/build
-          mkdir -p /mnt/buildroot
+          sudo mkdir -p /mnt/buildroot
+          sudo chown -R $USER:$USER /mnt/buildroot
           ln -s /mnt/buildroot $GITHUB_WORKSPACE/build
           ls -ld $GITHUB_WORKSPACE/build
+          df -h /mnt
+
 
       - name: Cache Buildroot downloads (dl/)
         uses: actions/cache@v4
