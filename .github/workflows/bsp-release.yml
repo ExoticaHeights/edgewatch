@@ -71,19 +71,26 @@ jobs:
         run: |
           echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >> $GITHUB_ENV
 
-      - name: Prepare build directory on /mnt (bind mount)
+      - name: Prepare build directory on /mnt (hard reset)
         run: |
+          echo "🔎 Cleaning any previous build path"
+          sudo umount $GITHUB_WORKSPACE/build 2>/dev/null || true
+          rm -rf $GITHUB_WORKSPACE/build
+      
+          echo "📁 Creating fresh build directory"
+          mkdir -p $GITHUB_WORKSPACE/build
+      
+          echo "📁 Preparing /mnt storage"
           sudo mkdir -p /mnt/buildroot
           sudo chown -R $USER:$USER /mnt/buildroot
       
-          rm -rf $GITHUB_WORKSPACE/build
-          mkdir -p $GITHUB_WORKSPACE/build
-      
+          echo "🔗 Bind-mounting /mnt/buildroot -> build"
           sudo mount --bind /mnt/buildroot $GITHUB_WORKSPACE/build
       
-          echo "Build directory mounted:"
+          echo "✅ Verifying build directory"
+          ls -ld $GITHUB_WORKSPACE/build
           mount | grep "$GITHUB_WORKSPACE/build"
-          df -h /mnt
+
 
 
 
