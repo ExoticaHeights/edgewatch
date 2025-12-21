@@ -1,79 +1,128 @@
-name: EdgeWatch BSP Release
+name: EdgeWatch BSP Pipeline
 
 on:
   workflow_dispatch:
     inputs:
+      ref:
+        description: "Git branch or tag to build (e.g. main, feature/ui, refs/tags/v1.0.0)"
+        required: true
+        type: string
       version:
         description: "BSP version (e.g. 1.0.1)"
         required: true
         type: string
 
 permissions:
-  contents: write
+  contents: write   # required for git push + GitHub release
 
+# =========================================================
+# SETUP JOB
+# =========================================================
 jobs:
-  bsp-release:
+  setup:
+    name: Setup Environment
     runs-on: ubuntu-latest
 
+    outputs:
+      ref: ${{ inputs.ref }}
+      version: ${{ inputs.version }}
+
     steps:
-      - name: Checkout repository (with submodules)
+      - name: Checkout repository (selected ref + submodules)
         uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.ref }}
           fetch-depth: 0
           submodules: recursive
 
-      - name: Install dependencies
+      - name: Free disk space (safe)
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /usr/share/swift
+          sudo apt-get clean
+          df -h
+
+      - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            git \
             build-essential \
-            autoconf \
-            flex \
-            bison \
-            libssl-dev \
+            rsync \
+            git \
+            gh \
             bc \
+            bison \
+            flex \
+            libssl-dev \
             libncurses-dev \
             python3 \
-            python3-setuptools \
-            python3-dev \
-            python3-yaml \
-            python3-jsonschema \
-            python3-pyelftools \
-            swig \
-            yamllint \
-            libgnutls28-dev \
-            make \
-            bash-completion \
-            passwd \
-            tar \
-            zip \
-            unzip \
-            rsync \
-            wget \
-            lsb-release \
+            perl \
             file \
-            xz-utils \
-            bzip2 \
-            device-tree-compiler \
-            u-boot-tools \
-            jq \
-            liblzo2-2 \
+            wget \
+            unzip \
             cpio \
-            dosfstools \
-            gh \
-            libgnutls28-dev
+            device-tree-compiler \
+            u-boot-tools
 
-      - name: Authenticate GitHub CLI
+      - name: Sanitize PATH for Buildroot
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >> $GITHUB_ENV
 
-      - name: Build BSP (errors only)
+      - name: Prepare build directory on /mnt
+        run: |
+          rm -rf $GITHUB_WORKSPACE/build
+          mkdir -p /mnt/buildroot
+          ln -s /mnt/buildroot $GITHUB_WORKSPACE/build
+          ls -ld $GITHUB_WORKSPACE/build
+
+      - name: Cache Buildroot downloads (dl/)
+        uses: actions/cache@v4
+        with:
+          path: build/dl
+          key: br-dl-${{ runner.os }}
+          restore-keys: |
+            br-dl-
+
+# =========================================================
+# BUILD JOB
+# =========================================================
+  build:
+    name: Build BSP
+    runs-on: ubuntu-latest
+    needs: setup
+
+    steps:
+      - name: Checkout repository (selected ref)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.setup.outputs.ref }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Restore build directory symlink
+        run: |
+          rm -rf $GITHUB_WORKSPACE/build
+          ln -s /mnt/buildroot $GITHUB_WORKSPACE/build
+
+      - name: Cache toolchain & output
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/output/host
+            build/output/build
+          key: br-out-${{ runner.os }}
+          restore-keys: |
+            br-out-
+
+      - name: Build BSP (errors only in console)
         run: |
           set -o pipefail
-          make build VERSION=${{ inputs.version }} \
+          make build VERSION=${{ needs.setup.outputs.version }} -j2 \
             > build.log 2> >(tee build.err >&2)
-      
+
       - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -82,3 +131,42 @@ jobs:
           path: |
             build.log
             build.err
+
+      - name: Upload build images
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-images
+          path: build/output/images/
+
+# =========================================================
+# RELEASE JOB
+# =========================================================
+  release:
+    name: Release BSP
+    runs-on: ubuntu-latest
+    needs: build
+    if: success()
+
+    steps:
+      - name: Checkout repository (selected ref)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.setup.outputs.ref }}
+          fetch-depth: 0
+
+      # ---------------- AUTHENTICATION ----------------
+      # Git auth: handled by actions/checkout
+      # GitHub API auth: handled below
+      - name: Authenticate GitHub CLI
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Restore build directory symlink
+        run: |
+          rm -rf $GITHUB_WORKSPACE/build
+          ln -s /mnt/buildroot $GITHUB_WORKSPACE/build
+
+      - name: Publish BSP Release
+        run: |
+          make publish VERSION=${{ needs.setup.outputs.version }}
