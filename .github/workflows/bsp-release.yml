@@ -71,14 +71,20 @@ jobs:
         run: |
           echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >> $GITHUB_ENV
 
-      - name: Prepare build directory on /mnt
+      - name: Prepare build directory on /mnt (bind mount)
         run: |
-          rm -rf $GITHUB_WORKSPACE/build
           sudo mkdir -p /mnt/buildroot
           sudo chown -R $USER:$USER /mnt/buildroot
-          ln -s /mnt/buildroot $GITHUB_WORKSPACE/build
-          ls -ld $GITHUB_WORKSPACE/build
+      
+          rm -rf $GITHUB_WORKSPACE/build
+          mkdir -p $GITHUB_WORKSPACE/build
+      
+          sudo mount --bind /mnt/buildroot $GITHUB_WORKSPACE/build
+      
+          echo "Build directory mounted:"
+          mount | grep "$GITHUB_WORKSPACE/build"
           df -h /mnt
+
 
 
       - name: Cache Buildroot downloads (dl/)
