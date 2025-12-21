@@ -1,4 +1,4 @@
-name: EdgeWatch BSP Pipeline
+name: EdgeWatch BSP Release
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ on:
         type: string
 
 permissions:
-  contents: write   # required for git push + GitHub release
+  contents: write
 
 # =========================================================
 # SETUP JOB
@@ -28,82 +28,47 @@ jobs:
       version: ${{ inputs.version }}
 
     steps:
-      - name: Checkout repository (selected ref + submodules)
+      - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
           submodules: recursive
 
-      - name: Free disk space (safe)
-        run: |
-          df -h
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /usr/share/swift
-          sudo apt-get clean
-          df -h
-
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
-            rsync \
             git \
-            gh \
-            bc \
-            bison \
+            build-essential \
+            autoconf \
             flex \
+            bison \
             libssl-dev \
+            bc \
             libncurses-dev \
             python3 \
-            perl \
-            file \
+            python3-setuptools \
+            python3-dev \
+            python3-yaml \
+            python3-jsonschema \
+            python3-pyelftools \
+            swig \
+            libgnutls28-dev \
+            rsync \
             wget \
-            unzip \
-            cpio \
+            file \
+            xz-utils \
+            bzip2 \
             device-tree-compiler \
-            u-boot-tools
-
-      - name: Sanitize PATH for Buildroot
-        run: |
-          echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" >> $GITHUB_ENV
-
-      - name: Prepare build directory on /mnt (hard reset)
-        run: |
-          echo "🔎 Cleaning any previous build path"
-          sudo umount $GITHUB_WORKSPACE/build 2>/dev/null || true
-          rm -rf $GITHUB_WORKSPACE/build
-      
-          echo "📁 Creating fresh build directory"
-          mkdir -p $GITHUB_WORKSPACE/build
-      
-          echo "📁 Preparing /mnt storage"
-          sudo mkdir -p /mnt/buildroot
-          sudo chown -R $USER:$USER /mnt/buildroot
-      
-          echo "🔗 Bind-mounting /mnt/buildroot -> build"
-          sudo mount --bind /mnt/buildroot $GITHUB_WORKSPACE/build
-      
-          echo "✅ Verifying build directory"
-          ls -ld $GITHUB_WORKSPACE/build
-          mount | grep "$GITHUB_WORKSPACE/build"
-
-
-
-
-      - name: Cache Buildroot downloads (dl/)
-        uses: actions/cache@v4
-        with:
-          path: build/dl
-          key: br-dl-${{ runner.os }}
-          restore-keys: |
-            br-dl-
+            u-boot-tools \
+            jq \
+            cpio \
+            dosfstools \
+            gh
 
 # =========================================================
-# BUILD JOB
+# BUILD JOB (ERRORS & WARNINGS ONLY)
 # =========================================================
   build:
     name: Build BSP
@@ -111,49 +76,33 @@ jobs:
     needs: setup
 
     steps:
-      - name: Checkout repository (selected ref)
+      - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.setup.outputs.ref }}
           fetch-depth: 0
           submodules: recursive
 
-      - name: Restore build directory symlink
-        run: |
-          rm -rf $GITHUB_WORKSPACE/build
-          ln -s /mnt/buildroot $GITHUB_WORKSPACE/build
-
-      - name: Cache toolchain & output
-        uses: actions/cache@v4
-        with:
-          path: |
-            build/output/host
-            build/output/build
-          key: br-out-${{ runner.os }}
-          restore-keys: |
-            br-out-
-
-      - name: Build BSP (errors only in console)
+      - name: Build BSP (errors & warnings only)
         run: |
           set -o pipefail
-          make build VERSION=${{ needs.setup.outputs.version }} -j2 \
-            > build.log 2> >(tee build.err >&2)
 
-      - name: Upload build logs
-        if: always()
+          # Safe parallelism (avoid OOM)
+          jproc=$(nproc)
+          [ "$jproc" -gt 4 ] && jproc=4
+          echo "Using parallel jobs: ${jproc}"
+
+          # Buildroot build
+          make build VERSION=${{ needs.setup.outputs.version }} -j${jproc} \
+            1>/dev/null \
+            2> >(tee build.err >&2)
+
+      - name: Upload error log (only if build fails)
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs
-          path: |
-            build.log
-            build.err
-
-      - name: Upload build images
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-images
-          path: build/output/images/
+          name: build-errors
+          path: build.err
 
 # =========================================================
 # RELEASE JOB
@@ -165,23 +114,15 @@ jobs:
     if: success()
 
     steps:
-      - name: Checkout repository (selected ref)
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.setup.outputs.ref }}
           fetch-depth: 0
 
-      # ---------------- AUTHENTICATION ----------------
-      # Git auth: handled by actions/checkout
-      # GitHub API auth: handled below
       - name: Authenticate GitHub CLI
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-
-      - name: Restore build directory symlink
-        run: |
-          rm -rf $GITHUB_WORKSPACE/build
-          ln -s /mnt/buildroot $GITHUB_WORKSPACE/build
 
       - name: Publish BSP Release
         run: |
