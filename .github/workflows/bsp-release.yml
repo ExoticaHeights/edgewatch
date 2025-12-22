@@ -83,19 +83,18 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Build BSP (errors & warnings only)
+      - name: Build BSP (errors only, silent console)
         run: |
           set -o pipefail
-
-          # Safe parallelism (avoid OOM)
+      
+          # Safe parallelism
           jproc=$(nproc)
           [ "$jproc" -gt 4 ] && jproc=4
-          echo "Using parallel jobs: ${jproc}"
-
-          # Buildroot build
+      
           make build VERSION=${{ needs.setup.outputs.version }} -j${jproc} \
             1>/dev/null \
-            2> >(tee build.err >&2)
+            2>build.err
+
 
       - name: Upload error log (only if build fails)
         if: failure()
