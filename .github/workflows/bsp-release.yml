@@ -33,7 +33,7 @@ jobs:
 
           mkdir -p /opt/buildroot/{out,dl}
 
-          make \
+          make publish\
             O=/opt/buildroot/out \
             DL_DIR=/opt/buildroot/dl \
             VERSION=${{ inputs.version }} \
