@@ -3,10 +3,6 @@ name: EdgeWatch BSP Release
 on:
   workflow_dispatch:
     inputs:
-      ref:
-        description: "Git branch or tag to build (e.g. main, feature/ui, refs/tags/v1.0.0)"
-        required: true
-        type: string
       version:
         description: "BSP version (e.g. 1.0.1)"
         required: true
@@ -15,114 +11,40 @@ on:
 permissions:
   contents: write
 
-# =========================================================
-# SETUP JOB
-# =========================================================
 jobs:
-  setup:
-    name: Setup Environment
-    runs-on: ubuntu-latest
-
-    outputs:
-      ref: ${{ inputs.ref }}
-      version: ${{ inputs.version }}
+  bsp-release:
+    name: Build & Release BSP
+    runs-on: [self-hosted, buildroot]
 
     steps:
       - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
           fetch-depth: 0
           submodules: recursive
-
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            git \
-            build-essential \
-            autoconf \
-            flex \
-            bison \
-            libssl-dev \
-            bc \
-            libncurses-dev \
-            python3 \
-            python3-setuptools \
-            python3-dev \
-            python3-yaml \
-            python3-jsonschema \
-            python3-pyelftools \
-            swig \
-            libgnutls28-dev \
-            rsync \
-            wget \
-            file \
-            xz-utils \
-            bzip2 \
-            device-tree-compiler \
-            u-boot-tools \
-            jq \
-            cpio \
-            dosfstools \
-            gh
-
-# =========================================================
-# BUILD JOB (ERRORS & WARNINGS ONLY)
-# =========================================================
-  build:
-    name: Build BSP
-    runs-on: ubuntu-latest
-    needs: setup
-
-    steps:
-      - name: Checkout repository (with submodules)
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.setup.outputs.ref }}
-          fetch-depth: 0
-          submodules: recursive
-
-      - name: Build BSP (errors only, silent console)
-        run: |
-          set -o pipefail
-      
-          # Safe parallelism
-          jproc=$(nproc)
-          [ "$jproc" -gt 4 ] && jproc=4
-      
-          make build VERSION=${{ needs.setup.outputs.version }} -j${jproc} \
-            1>/dev/null \
-            2>build.err
-
-
-      - name: Upload error log (only if build fails)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-errors
-          path: build.err
-
-# =========================================================
-# RELEASE JOB
-# =========================================================
-  release:
-    name: Release BSP
-    runs-on: ubuntu-latest
-    needs: build
-    if: success()
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.setup.outputs.ref }}
-          fetch-depth: 0
 
       - name: Authenticate GitHub CLI
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-      - name: Publish BSP Release
+      - name: Build BSP (errors only)
         run: |
-          make publish VERSION=${{ needs.setup.outputs.version }}
+          set -o pipefail
+
+          mkdir -p /opt/buildroot/{out,dl}
+
+          make \
+            O=/opt/buildroot/out \
+            DL_DIR=/opt/buildroot/dl \
+            VERSION=${{ inputs.version }} \
+            -j$(nproc) \
+            > build.log 2> >(tee build.err >&2)
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build.log
+            build.err
