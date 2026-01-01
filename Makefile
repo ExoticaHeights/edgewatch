@@ -10,6 +10,7 @@ BUILDROOT_SRC := $(abspath $(strip $(BUILDROOT_SRC_RAW)))
 BUILD_DIR     := $(abspath $(strip $(BUILD_DIR_RAW)))
 
 CONFIG_DIR    := configs
+PATCH_DIR     := patches
 CONFIG_FILE   := $(CONFIG_DIR)/edgewatch_defconfig
 KERNEL_IMAGE  := $(BUILD_DIR)/output/images/Image
 TOOLCHAIN_IMAGE := EdgeWatch.tar.gz
@@ -73,7 +74,13 @@ menuconfig: prepare
 # =========================================================
 # Configuration
 # =========================================================
-build: prepare
+
+patches: prepare
+	@echo "→ Applying patches from '$(PATCH_DIR)'"
+	cp -R "$(PATCH_DIR)/buildroot/package/qt6/qt6.mk" "$(BUILD_DIR)/package/qt6/qt6.mk"
+	@echo "✔ Patches applied"
+
+build: prepare patches
 	cp -R $(CONFIG_DIR)/new_config $(BUILD_DIR)/.config
 	$(MAKE) -C "$(BUILD_DIR)" -j$(shell nproc)
 	mv $(BUILD_DIR)/output/images/*.tar.gz "$(TOOLCHAIN_IMAGE)"
