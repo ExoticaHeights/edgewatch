@@ -443,6 +443,7 @@ BR2_HOST_DIR="$(BASE_DIR)/host"
 # Mirrors and Download locations
 #
 BR2_PRIMARY_SITE=""
+# BR2_PRIMARY_SITE_ONLY is not set
 BR2_BACKUP_SITE="https://sources.buildroot.net"
 BR2_KERNEL_MIRROR="https://cdn.kernel.org/pub"
 BR2_GNU_MIRROR="https://ftpmirror.gnu.org"
