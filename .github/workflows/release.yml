@@ -1,10 +1,11 @@
 name: EdgeWatch Release (Makefile Owned)
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. v1.0.0-b1)"
+        required: true
 
 jobs:
   checkout:
