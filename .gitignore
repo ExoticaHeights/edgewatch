@@ -1,0 +1,16 @@
+# Buildroot build artifacts
+buildroot/output/
+buildroot/dl/
+
+# External toolchains (never commit)
+toolchains/
+
+# Editor / OS noise
+*.swp
+*.swo
+*.tmp
+*.log
+*.bak
+*~
+.DS_Store
+
