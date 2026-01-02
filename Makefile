@@ -1,22 +1,38 @@
-.PHONY: all info build
+# EdgeWatch top-level Makefile
+# Reproducible Buildroot build wrapper
 
-GIT_REF       ?= unknown
-COMMIT_SHA   ?= unknown
-RELEASE_TYPE ?= dev
-BUILD_TS     ?= $(shell date +%Y%m%d%H%M%S)
+BUILDROOT_DIR := buildroot
+OUT_DIR       := out/buildroot
+CONFIG_FILE   := configs/qemu-aarch64/edgewatch_qemu_aarch64.config
 
-all: info build
+.PHONY: all build clean distclean help
 
-info:
-	@echo "==== Build Info ===="
-	@echo "GIT_REF       : $(GIT_REF)"
-	@echo "COMMIT_SHA   : $(COMMIT_SHA)"
-	@echo "RELEASE_TYPE : $(RELEASE_TYPE)"
-	@echo "BUILD_TS     : $(BUILD_TS)"
-	@echo "===================="
+all: build
+
+help:
+	@echo "EdgeWatch Build System"
+	@echo ""
+	@echo "Targets:"
+	@echo "  build       Apply config and build Buildroot"
+	@echo "  clean       Clean build artifacts"
+	@echo "  distclean   Remove all build output"
+	@echo ""
 
 build:
-	@echo "Running build test..."
-	@uname -a
-	@sleep 2
-	@echo "Build test successful"
+	@echo "==> Preparing build directory"
+	mkdir -p $(OUT_DIR)
+
+	@echo "==> Applying EdgeWatch QEMU AArch64 config"
+	cp $(CONFIG_FILE) $(OUT_DIR)/.config
+
+	@echo "==> Building Buildroot"
+	$(MAKE) -C $(BUILDROOT_DIR) O=$(abspath $(OUT_DIR))
+
+clean:
+	@echo "==> Cleaning build artifacts"
+	$(MAKE) -C $(BUILDROOT_DIR) O=$(abspath $(OUT_DIR)) clean
+
+distclean:
+	@echo "==> Removing all build output"
+	rm -rf out
+
