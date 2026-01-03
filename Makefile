@@ -19,6 +19,12 @@ KERNEL_IMAGE  := $(BUILD_DIR)/output/images/Image
 TOOLCHAIN_IMAGE := EdgeWatch.tar.gz
 
 # ---------------------------------------------------------
+# Sanitized PATH for Buildroot (self-hosted safe)
+# ---------------------------------------------------------
+CLEAN_PATH := /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+
+# ---------------------------------------------------------
 # External Toolchain (MANDATORY)
 # ---------------------------------------------------------
 TOOLCHAIN_VERSION ?= toolchain-v1.0.0
@@ -126,8 +132,13 @@ patches: prepare
 build: prepare patches toolchain
 	@test -f "$(CONFIG_FILE)" || (echo "ERROR: config missing"; exit 1)
 	cp "$(CONFIG_FILE)" "$(BUILD_DIR)/.config"
+
+	PATH="$(abspath $(TOOLCHAIN_DIR))/bin:$(CLEAN_PATH)" \
 	$(MAKE) -C "$(BUILD_DIR)" olddefconfig
+
+	PATH="$(abspath $(TOOLCHAIN_DIR))/bin:$(CLEAN_PATH)" \
 	$(MAKE) -C "$(BUILD_DIR)" -j$(shell nproc)
+
 	@ls "$(BUILD_DIR)/output/images" >/dev/null
 
 # =========================================================
