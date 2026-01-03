@@ -51,5 +51,5 @@ jobs:
 
       - name: Build & Publish BSP
         run: |
-          make publish VERSION=${{ inputs.version }} TOOLCHAIN_VERSION=tc-v1.0.0
+          make publish VERSION=${{ inputs.version }} TOOLCHAIN_VERSION=toolchain-v1.0.0
 
