@@ -59,15 +59,22 @@ jobs:
 
       - name: Build & Publish BSP
         run: |
-          make publish \
-            VERSION=${{ inputs.version }} \
-            TOOLCHAIN_VERSION=toolchain-v1.0.0
-            - name: Cleanup runner workspace
-            if: always()
-            run: |
-              echo "Cleaning runner workspace"
-              rm -rf build/output || true
-              rm -rf out || true
-              rm -rf tmp || true
-              rm -rf /home/sandy/actions-runner/_work/edgewatch || true
-
+          make publish VERSION=${{ inputs.version }} TOOLCHAIN_VERSION=toolchain-v1.0.0 \
+            > /dev/null 2> build.err
+      - name: Upload error log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-errors
+          path: build.err
+  cleanup:
+      name: Cleanup runner workspace
+      runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
+      needs: publish
+      if: always()
+      steps:
+        - name: Remove checked-out project
+          run: |
+            echo "Cleaning workspace..."
+            rm -rf "$GITHUB_WORKSPACE"
+            mkdir -p "$GITHUB_WORKSPACE"
