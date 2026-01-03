@@ -21,7 +21,7 @@ TOOLCHAIN_IMAGE := EdgeWatch.tar.gz
 # ---------------------------------------------------------
 # External Toolchain (MANDATORY)
 # ---------------------------------------------------------
-TOOLCHAIN_VERSION ?= tc-v1.0.0
+TOOLCHAIN_VERSION ?= toolchain-v1.0.0
 TOOLCHAIN_NAME := arm-gnu-toolchain-13.2.Rel1-x86_64-aarch64-none-linux-gnu
 TOOLCHAIN_ARCHIVE := $(TOOLCHAIN_NAME).tar.xz
 
