@@ -1,10 +1,10 @@
-name: EdgeWatch Release (Makefile Owned)
+name: EdgeWatch BSP Release (Makefile Owned)
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.0.0-b1)"
+        description: "Release version (e.g. 1.0.0, 1.0.1-rc1)"
         required: true
 
 jobs:
@@ -12,17 +12,16 @@ jobs:
     name: Checkout source
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
   setup:
-    name: Setup host dependencies
+    name: Setup build environment
     runs-on: ubuntu-22.04
     needs: checkout
     steps:
-      - name: Install build dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -31,9 +30,6 @@ jobs:
             bison \
             flex \
             libncurses-dev \
-            python3 \
-            xz-utils \
-            curl \
             rsync \
             git \
             gh
@@ -42,73 +38,18 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-  toolchain:
-    name: Prepare external toolchain
+  publish:
+    name: Build & Publish BSP
     runs-on: ubuntu-22.04
     needs: setup
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Cache toolchain
-        uses: actions/cache@v4
-        with:
-          path: toolchains
-          key: toolchain-v1.0.0
-
-      - name: Download toolchain
-        run: |
-          make toolchain
-
-  build:
-    name: Build EdgeWatch images
-    runs-on: ubuntu-22.04
-    needs: toolchain
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Restore toolchain cache
-        uses: actions/cache@v4
-        with:
-          path: toolchains
-          key: toolchain-v1.0.0
-
-      - name: Build
-        run: |
-          make build
-
-  release:
-    name: Publish release (Makefile driven)
-    runs-on: ubuntu-22.04
-    needs: build
     permissions:
       contents: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Restore toolchain cache
-        uses: actions/cache@v4
-        with:
-          path: toolchains
-          key: toolchain-v1.0.0
-
-      - name: Publish using Makefile
-        env:
-          TAG_NAME: ${{ github.ref_name }}
+      - name: Build & Publish BSP
         run: |
-          make publish
-
-  cleanup:
-    name: Cleanup runner
-    runs-on: ubuntu-22.04
-    needs: release
-    if: always()
-    steps:
-      - name: Cleanup workspace
-        run: |
-          rm -rf out toolchains || true
+          make publish VERSION=${{ inputs.version }} TOOLCHAIN_VERSION=tc-v1.0.0
 
