@@ -48,17 +48,17 @@ jobs:
 
       - name: Build BSP (silent, errors only)
         run: |
-          make build \
-            VERSION=${{ inputs.version }} \
-            TOOLCHAIN_VERSION=toolchain-v1.0.0 \
-            > /dev/null 2> build.err
+          touch build.err
+          make build VERSION=${{ inputs.version }} TOOLCHAIN_VERSION=toolchain-v1.0.0 \
+            > /dev/null 2>> build.err
 
-      - name: Upload build artifacts
+      - name: Upload build error log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bsp-build
-          path: |
-            build.err
+          name: bsp-build-errors
+          path: build.err
+
 
   publish:
     name: Publish BSP
