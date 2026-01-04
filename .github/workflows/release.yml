@@ -37,50 +37,69 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
   build:
-        name: Build BSP
-        needs: setup
-        runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
-      
-        steps:
-          - uses: actions/checkout@v4
-            with:
-              fetch-depth: 0
-      
-          - name: Build BSP (silent, errors only)
-            run: |
-              touch build.err
-              make build VERSION=${{ inputs.version }} TOOLCHAIN_VERSION=toolchain-v1.0.0 \
-                > /dev/null 2>> build.err
-      
-          - name: Upload error log (only on failure)
-            if: always()
-            uses: actions/upload-artifact@v4
-            with:
-              name: build-errors
-              path: build.err
+    name: Build BSP
+    needs: setup
+    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
+  
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+  
+      - name: Build BSP (silent, errors only)
+        run: |
+          touch build.err
+          make build VERSION=${{ inputs.version }} TOOLCHAIN_VERSION=toolchain-v1.0.0 \
+            > /dev/null 2>> build.err
+  
+      # ✅ ERROR UPLOAD (YOU ASKED FOR THIS – HERE IT IS)
+      - name: Upload build errors
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-errors
+          path: build.err
+  
+      # ✅ IMAGE UPLOAD (MANDATORY FOR REAL RELEASE)
+      - name: Upload build images
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bsp-images
+          path: |
+            build/output/images/Image
+
   publish:
-      name: Publish BSP
-      needs: build
-      runs-on: ubuntu-22.04
-      permissions:
-        contents: write
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-      steps:
-        - uses: actions/checkout@v4
-          with:
-            fetch-depth: 0
-    
-        - name: Publish BSP
-          run: |
-            make publish VERSION=${{ inputs.version }}
+    name: Publish BSP
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+  
+      # ✅ RESTORE IMAGES WHERE MAKEFILE EXPECTS THEM
+      - name: Restore build images
+        uses: actions/download-artifact@v4
+        with:
+          name: bsp-images
+          path: build/output/images
+  
+      - name: Publish BSP
+        run: |
+          make publish VERSION=${{ inputs.version }}
+
   cleanup:
     name: Cleanup runner workspace
     if: always()
     needs: publish
     runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
-
+    
     steps:
       - name: Cleanup checked-out project
         run: |
