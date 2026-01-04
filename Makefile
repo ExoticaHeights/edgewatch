@@ -11,9 +11,9 @@ BUILD_DIR_RAW     := build
 BUILDROOT_SRC := $(abspath $(strip $(BUILDROOT_SRC_RAW)))
 BUILD_DIR     := $(abspath $(strip $(BUILD_DIR_RAW)))
 
-CONFIG_DIR    := configs
+CONFIG_DIR    := configs/qemu-aarch64
 PATCH_DIR     := patches
-CONFIG_FILE   := $(CONFIG_DIR)/edgewatch_defconfig
+CONFIG_FILE   := $(CONFIG_DIR)/edgewatch_qemu_aarch64.config
 
 KERNEL_IMAGE  := $(BUILD_DIR)/output/images/Image
 TOOLCHAIN_IMAGE := EdgeWatch.tar.gz

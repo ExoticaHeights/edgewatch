@@ -5,6 +5,8 @@ buildroot/dl/
 # External toolchains (never commit)
 toolchains/
 out/
+build/
+arm-gnu-toolchain-*/
 
 # Editor / OS noise
 *.swp
