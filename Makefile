@@ -23,7 +23,6 @@ TOOLCHAIN_IMAGE := EdgeWatch.tar.gz
 # ---------------------------------------------------------
 CLEAN_PATH := /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-
 # ---------------------------------------------------------
 # External Toolchain (MANDATORY)
 # ---------------------------------------------------------
@@ -37,8 +36,7 @@ TOOLCHAIN_BIN := $(TOOLCHAIN_DIR)/bin/aarch64-none-linux-gnu-gcc
 TOOLCHAIN_REPO := ExoticaHeights/edgewatch
 TOOLCHAIN_URL := https://github.com/$(TOOLCHAIN_REPO)/releases/download/$(TOOLCHAIN_VERSION)/$(TOOLCHAIN_ARCHIVE)
 
-
-REMOTE        := origin
+REMOTE := origin
 
 # ---------------------------------------------------------
 # Buildroot
@@ -72,7 +70,7 @@ help:
 	@echo "Targets:"
 	@echo "  defconfig     Configure Buildroot"
 	@echo "  build         Build BSP"
-	@echo "  publish       Build + tag + release"
+	@echo "  publish       Tag + release (no rebuild)"
 
 # =========================================================
 # Toolchain fetch & install
@@ -91,7 +89,6 @@ toolchain:
 	@test -x "$(TOOLCHAIN_BIN)" || \
 	 (echo "ERROR: toolchain gcc not found"; exit 1)
 	@echo "✔ Toolchain ready: $(TOOLCHAIN_BIN)"
-
 
 # =========================================================
 # Prepare build directory
@@ -118,7 +115,7 @@ menuconfig: prepare
 	@$(MAKE) sync-config
 
 # =========================================================
-# Apply patches (kept from your logic)
+# Apply patches
 # =========================================================
 patches: prepare
 	@if [ -d "$(PATCH_DIR)" ]; then \
@@ -139,7 +136,8 @@ build: prepare patches toolchain
 	PATH="$(abspath $(TOOLCHAIN_DIR))/bin:$(CLEAN_PATH)" \
 	$(MAKE) -C "$(BUILD_DIR)" -j$(shell nproc)
 
-	@ls "$(BUILD_DIR)/output/images" >/dev/null
+	@test -f "$(KERNEL_IMAGE)" || \
+	 (echo "ERROR: Kernel image not found after build"; exit 1)
 
 # =========================================================
 # Sync config back to repo
@@ -184,9 +182,9 @@ check-kernel:
 	 (echo "ERROR: Kernel image not found"; exit 1)
 
 # =========================================================
-# Release
+# Release (NO BUILD ASSUMPTIONS)
 # =========================================================
-release: check-version check-clean git-config check-tag-exists check-remote-tag defconfig  check-kernel
+release: check-version check-clean git-config check-tag-exists check-remote-tag
 	@echo "→ Releasing $(TAG_NAME)"
 	@git tag -a "$(TAG_NAME)" -m "EdgeWatch BSP $(TAG_NAME)"
 
