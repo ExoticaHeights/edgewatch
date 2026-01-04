@@ -12,18 +12,9 @@ on:
         default: "github"
 
 jobs:
-  checkout:
-    name: Checkout source
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
   setup:
     name: Setup build environment
     runs-on: ubuntu-22.04
-    needs: checkout
     steps:
       - name: Install dependencies (GitHub runner only)
         if: inputs.runner == 'github'
@@ -37,19 +28,17 @@ jobs:
             libncurses-dev \
             rsync \
             git \
-            gh
+            gh \
+            curl \
+            xz-utils
 
       - name: Authenticate GitHub CLI
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-  publish:
-    name: Build & Publish BSP
+  build:
+    name: Build BSP
     needs: setup
-    permissions:
-      contents: write
-
-    # 👇 THIS IS THE KEY PART
     runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
 
     steps:
@@ -57,8 +46,50 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build & Publish BSP
+      - name: Build BSP (silent, errors only)
         run: |
-          make publish \
+          make build \
             VERSION=${{ inputs.version }} \
-            TOOLCHAIN_VERSION=toolchain-v1.0.0
+            TOOLCHAIN_VERSION=toolchain-v1.0.0 \
+            > /dev/null 2> build.err
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bsp-build
+          path: |
+            build.err
+
+  publish:
+    name: Publish BSP
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bsp-build
+
+      - name: Publish BSP
+        run: |
+          make publish VERSION=${{ inputs.version }}
+
+  cleanup:
+    name: Cleanup runner workspace
+    if: always()
+    needs: publish
+    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
+
+    steps:
+      - name: Cleanup checked-out project
+        run: |
+          echo "Cleaning workspace"
+          rm -rf "$GITHUB_WORKSPACE"
+          mkdir -p "$GITHUB_WORKSPACE"

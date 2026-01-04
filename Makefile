@@ -186,7 +186,7 @@ check-kernel:
 # =========================================================
 # Release
 # =========================================================
-release: check-version check-clean git-config check-tag-exists check-remote-tag defconfig build check-kernel
+release: check-version check-clean git-config check-tag-exists check-remote-tag defconfig  check-kernel
 	@echo "→ Releasing $(TAG_NAME)"
 	@git tag -a "$(TAG_NAME)" -m "EdgeWatch BSP $(TAG_NAME)"
 
@@ -200,7 +200,6 @@ gh-release:
 	@gh release create "$(TAG_NAME)" \
 		--title "$(TAG_NAME)" \
 		--notes "EdgeWatch BSP release $(TAG_NAME)" \
-		"$(CONFIG_FILE)" \
 		"$(KERNEL_IMAGE)" \
 		|| (echo "ERROR: GitHub release failed"; exit 1)
 
