@@ -94,15 +94,3 @@ jobs:
         run: |
           make publish VERSION=${{ inputs.version }}
 
-  cleanup:
-    name: Cleanup runner workspace
-    if: always()
-    needs: publish
-    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
-    
-    steps:
-      - name: Cleanup checked-out project
-        run: |
-          echo "Cleaning workspace"
-          rm -rf "$GITHUB_WORKSPACE"
-          mkdir -p "$GITHUB_WORKSPACE"
