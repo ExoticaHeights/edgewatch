@@ -15,8 +15,14 @@ CONFIG_DIR    := configs/qemu-aarch64
 PATCH_DIR     := patches
 CONFIG_FILE   := $(CONFIG_DIR)/edgewatch_qemu_aarch64.config
 
-KERNEL_IMAGE  := $(BUILD_DIR)/output/images/Image
-TOOLCHAIN_IMAGE := EdgeWatch.tar.gz
+OUTPUT_DIR    := $(BUILD_DIR)/output
+FINAL_IMAGES_DIR := $(OUTPUT_DIR)/images
+KERNEL_IMAGE     := $(FINAL_IMAGES_DIR)/Image
+TOOLCHAIN_IMAGE  := $(FINAL_IMAGES_DIR)/EdgeWatch_$(VERSION).tar.gz
+ROOTFS_TAR       := $(FINAL_IMAGES_DIR)/EdgeWatch_main_rootfs_$(VERSION).tar.gz
+ROOTFS_EXT2      := $(FINAL_IMAGES_DIR)/rootfs.ext2
+ROOTFS_EXT4      := $(FINAL_IMAGES_DIR)/rootfs.ext4
+
 
 # ---------------------------------------------------------
 # Sanitized PATH for Buildroot (self-hosted safe)
@@ -136,6 +142,28 @@ build: prepare patches toolchain
 	PATH="$(abspath $(TOOLCHAIN_DIR))/bin:$(CLEAN_PATH)" \
 	$(MAKE) -C "$(BUILD_DIR)" -j$(shell nproc)
 
+	PATH="$(abspath $(TOOLCHAIN_DIR))/bin:$(CLEAN_PATH)" \
+	$(MAKE) -C "$(BUILD_DIR)" sdk -j$(shell nproc)
+
+	@test -f "$(KERNEL_IMAGE)" || \
+	 (echo "ERROR: Kernel image not found after build"; exit 1)
+
+# =========================================================
+# Sync config back to repo
+# =========================================================
+sync-config:
+	@mkdir -p "$(CONFIG_DIR)"
+	@cp "$(BUILD_DIR)/.config" "$(CONFIG_FILE)"
+
+# =========================================================
+# Git identity (CI-safe)
+# =========================================================
+git-config:
+	@if ! git config user.name >/dev/null; then \
+		git config user.name "edgewatch-ci"; \
+	fi
+	@if ! git config user.email >/dev/null; then \
+		git config user.email "edgewatch-ci@users.noreply.github.com"; \
 	@test -f "$(KERNEL_IMAGE)" || \
 	 (echo "ERROR: Kernel image not found after build"; exit 1)
 
@@ -194,12 +222,24 @@ release: check-version check-clean git-config check-tag-exists check-remote-tag
 push:
 	@git push "$(REMOTE)" "$(TAG_NAME)"
 
-gh-release:
+generate_images:
+	mv $(FINAL_IMAGES_DIR)/*.tar.gz $(TOOLCHAIN_IMAGE)
+	tar -czf $(ROOTFS_TAR) -C $(OUTPUT_DIR) target
+
+gh-release: generate_images
+	@test -f "$(KERNEL_IMAGE)"
+	@test -f "$(TOOLCHAIN_IMAGE)"
+	@test -f "$(ROOTFS_TAR)"
+	@test -f "$(ROOTFS_EXT2)"
+	@test -f "$(ROOTFS_EXT4)"
 	@gh release create "$(TAG_NAME)" \
-		--title "$(TAG_NAME)" \
-		--notes "EdgeWatch BSP release $(TAG_NAME)" \
-		"$(KERNEL_IMAGE)" \
-		|| (echo "ERROR: GitHub release failed"; exit 1)
+                --title "$(TAG_NAME)" \
+                --notes "EdgeWatch BSP release $(TAG_NAME)" \
+                "$(KERNEL_IMAGE)" \
+                "$(TOOLCHAIN_IMAGE)" \
+                "$(ROOTFS_TAR)" \
+                "$(ROOTFS_EXT2)" \
+                "$(ROOTFS_EXT4)"
 
 publish: release push gh-release
 	@echo "✔ BSP $(TAG_NAME) published successfully"
