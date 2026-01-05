@@ -36,39 +36,45 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
-  build:
-    name: Build BSP
-    needs: setup
-    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
-  
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-  
-      - name: Build BSP (silent, errors only)
-        run: |
-          touch build.err
-          make build VERSION=${{ inputs.version }} TOOLCHAIN_VERSION=toolchain-v1.0.0 \
-            > /dev/null 2>> build.err
-  
-      # ✅ ERROR UPLOAD (YOU ASKED FOR THIS – HERE IT IS)
-      - name: Upload build errors
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-errors
-          path: build.err
-  
-      - name: Restore build images
-        uses: actions/download-artifact@v4
-        with:
-          name: bsp-images
-          path: build/output/images
-      
-      - name: Flatten images
-        run: |
+build:
+  name: Build BSP
+  needs: setup
+  runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
+
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Build BSP (silent, errors only)
+      run: |
+        mkdir -p build/output/images
+        touch build.err
+        make build VERSION=${{ inputs.version }} TOOLCHAIN_VERSION=toolchain-v1.0.0 \
+          > /dev/null 2>> build.err
+
+    # Upload build errors (if any)
+    - name: Upload build errors
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-errors
+        path: build.err
+
+    # ✅ Upload BSP images so downstream jobs can use them
+    - name: Upload BSP images
+      uses: actions/upload-artifact@v4
+      with:
+        name: bsp-images
+        path: build/output/images
+
+    # Flatten images (optional, depends on your Makefile)
+    - name: Flatten images
+      run: |
+        if [ -d build/output/images/Image ]; then
           mv build/output/images/Image/* build/output/images/
+        fi
+
 
   publish:
     name: Publish BSP
