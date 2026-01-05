@@ -1,4 +1,4 @@
-name: EdgeWatch BSP Release (Makefile Owned)
+name: EdgeWatch BSP Release
 
 on:
   workflow_dispatch:
@@ -40,7 +40,6 @@ jobs:
     name: Build BSP
     needs: setup
     runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,7 +52,7 @@ jobs:
           make build VERSION=${{ inputs.version }} TOOLCHAIN_VERSION=toolchain-v1.0.0 \
             > /dev/null 2>> build.err
 
-      # Upload build errors (if any)
+      # Upload build errors if any
       - name: Upload build errors
         if: failure()
         uses: actions/upload-artifact@v4
@@ -61,20 +60,22 @@ jobs:
           name: build-errors
           path: build.err
 
-      # ✅ Upload BSP images so downstream jobs can use them
+      # ✅ Upload BSP images
       - name: Upload BSP images
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: bsp-images
           path: build/output/images
+          retention-days: 7
 
-      # Flatten images (optional, depends on your Makefile)
+      # Flatten images (optional)
       - name: Flatten images
+        if: success()
         run: |
           if [ -d build/output/images/Image ]; then
             mv build/output/images/Image/* build/output/images/
           fi
-
 
   publish:
     name: Publish BSP
@@ -84,19 +85,27 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-  
-      # ✅ RESTORE IMAGES WHERE MAKEFILE EXPECTS THEM
-      - name: Restore build images
+
+      # ✅ Restore BSP images (skip if they don't exist)
+      - name: Restore BSP images
+        id: restore-images
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: bsp-images
           path: build/output/images
-  
+
+      - name: Check images exist
+        run: |
+          if [ ! -d build/output/images ] || [ -z "$(ls -A build/output/images)" ]; then
+            echo "No BSP images found, skipping publish."
+            exit 1
+          fi
+
       - name: Publish BSP
         run: |
           make publish VERSION=${{ inputs.version }}
