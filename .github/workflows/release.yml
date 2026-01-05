@@ -60,14 +60,15 @@ jobs:
           name: build-errors
           path: build.err
   
-      # ✅ IMAGE UPLOAD (MANDATORY FOR REAL RELEASE)
-      - name: Upload build images
-        if: success()
-        uses: actions/upload-artifact@v4
+      - name: Restore build images
+        uses: actions/download-artifact@v4
         with:
           name: bsp-images
-          path: |
-            build/output/images/Image
+          path: build/output/images
+      
+      - name: Flatten images
+        run: |
+          mv build/output/images/Image/* build/output/images/
 
   publish:
     name: Publish BSP
@@ -94,3 +95,14 @@ jobs:
         run: |
           make publish VERSION=${{ inputs.version }}
 
+  cleanup:
+    name: Cleanup runner workspace
+    if: always()
+    needs: publish
+    runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
+    steps:
+      - name: Cleanup checked-out project
+        run: |
+          echo "Cleaning workspace"
+          rm -rf "$GITHUB_WORKSPACE"
+          mkdir -p "$GITHUB_WORKSPACE"
