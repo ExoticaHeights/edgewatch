@@ -136,13 +136,10 @@ build: prepare patches
 	@test -f "$(CONFIG_FILE)" || (echo "ERROR: config missing"; exit 1)
 	cp "$(CONFIG_FILE)" "$(BUILD_DIR)/.config"
 
-	PATH="$(abspath $(TOOLCHAIN_DIR))/bin:$(CLEAN_PATH)" \
 	$(MAKE) -C "$(BUILD_DIR)" olddefconfig
 
-	PATH="$(abspath $(TOOLCHAIN_DIR))/bin:$(CLEAN_PATH)" \
 	$(MAKE) -C "$(BUILD_DIR)" -j$(shell nproc)
 
-	PATH="$(abspath $(TOOLCHAIN_DIR))/bin:$(CLEAN_PATH)" \
 	$(MAKE) -C "$(BUILD_DIR)" sdk -j$(shell nproc)
 
 	@test -f "$(KERNEL_IMAGE)" || \
