@@ -132,7 +132,7 @@ patches: prepare
 # =========================================================
 # Build
 # =========================================================
-build: prepare patches toolchain
+build: prepare patches
 	@test -f "$(CONFIG_FILE)" || (echo "ERROR: config missing"; exit 1)
 	cp "$(CONFIG_FILE)" "$(BUILD_DIR)/.config"
 
