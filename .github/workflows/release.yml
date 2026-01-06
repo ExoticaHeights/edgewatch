@@ -74,7 +74,7 @@ jobs:
         if: success()
         run: |
           if [ -d build/output/images/Image ]; then
-            mv build/output/images/Image/* build/output/images/
+            cp -rf build/output/images/Image/* build/output/images/
           fi
 
   publish:
