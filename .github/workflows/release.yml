@@ -69,12 +69,13 @@ jobs:
           path: build/output/images
           retention-days: 7
 
-      # Flatten images (optional)
+      # Flatten images 
       - name: Flatten images
         if: success()
         run: |
-          if [ -d build/output/images/Image ]; then
-            cp -rf build/output/images/Image/* build/output/images/
+          if [ -d build/output/images ]; then
+            cp -rf build/output/target        build/output/
+            cp -rf build/output/images/* build/output/images/
           fi
 
   publish:
