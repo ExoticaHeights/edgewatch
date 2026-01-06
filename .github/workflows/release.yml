@@ -40,48 +40,6 @@ jobs:
     name: Build BSP
     needs: setup
     runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Build BSP (silent, errors only)
-        run: |
-          mkdir -p build/output/images
-          touch build.err
-          make build VERSION=${{ inputs.version }} TOOLCHAIN_VERSION=toolchain-v1.0.0 \
-            > /dev/null 2>> build.err
-
-      # Upload build errors if any
-      - name: Upload build errors
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-errors
-          path: build.err
-
-      # ✅ Upload BSP images
-      - name: Upload BSP images
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: bsp-images
-          path: build/output/images
-          retention-days: 7
-
-      # Flatten images 
-      - name: Flatten images
-        if: success()
-        run: |
-          if [ -d build/output/images ]; then
-            cp -rf build/output/target        build/output/
-            cp -rf build/output/images/* build/output/images/
-          fi
-
-  publish:
-    name: Publish BSP
-    needs: build
-    runs-on: ubuntu-22.04
     permissions:
       contents: write
     env:
@@ -91,30 +49,26 @@ jobs:
         with:
           fetch-depth: 0
 
-      # ✅ Restore BSP images (skip if they don't exist)
-      - name: Restore BSP images
-        id: restore-images
-        continue-on-error: true
-        uses: actions/download-artifact@v4
+      - name: Build BSP (silent, errors only)
+        run: |
+          mkdir -p build/output/images
+          touch build.err
+          make publish VERSION=${{ inputs.version }} TOOLCHAIN_VERSION=toolchain-v1.0.0 \
+            > /dev/null 2>> build.err
+
+      # Upload build errors if any
+      - name: Upload build errors
+        if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          name: bsp-images
-          path: build/output/images
-
-      - name: Check images exist
-        run: |
-          if [ ! -d build/output/images ] || [ -z "$(ls -A build/output/images)" ]; then
-            echo "No BSP images found, skipping publish."
-            exit 1
-          fi
-
-      - name: Publish BSP
-        run: |
-          make publish VERSION=${{ inputs.version }}
+          name: build-errors
+          path: build.err
+          retention-days: 7
 
   cleanup:
     name: Cleanup runner workspace
     if: always()
-    needs: publish
+    needs: build
     runs-on: ${{ inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-22.04' }}
     steps:
       - name: Cleanup checked-out project
