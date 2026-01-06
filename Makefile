@@ -209,10 +209,14 @@ check-kernel:
 	@test -f "$(KERNEL_IMAGE)" || \
 	 (echo "ERROR: Kernel image not found"; exit 1)
 
+generate_images:
+	mv $(FINAL_IMAGES_DIR)/*.tar.gz $(TOOLCHAIN_IMAGE)
+	tar -czf $(ROOTFS_TAR) -C $(OUTPUT_DIR) target
+
 # =========================================================
 # Release (NO BUILD ASSUMPTIONS)
 # =========================================================
-release: check-version check-clean git-config check-tag-exists check-remote-tag
+release: check-version check-clean git-config check-tag-exists check-remote-tag build generate_images
 	@echo "→ Releasing $(TAG_NAME)"
 	@git tag -a "$(TAG_NAME)" -m "EdgeWatch BSP $(TAG_NAME)"
 
@@ -221,10 +225,6 @@ release: check-version check-clean git-config check-tag-exists check-remote-tag
 # =========================================================
 push:
 	@git push "$(REMOTE)" "$(TAG_NAME)"
-
-generate_images:
-	mv $(FINAL_IMAGES_DIR)/*.tar.gz $(TOOLCHAIN_IMAGE)
-	tar -czf $(ROOTFS_TAR) -C $(OUTPUT_DIR) target
 
 gh-release: generate_images
 	@test -f "$(KERNEL_IMAGE)"
